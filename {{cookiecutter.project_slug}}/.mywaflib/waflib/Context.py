@@ -396,7 +396,8 @@ class Context(ctx):
 				Logs.info(out, extra={'stream':sys.stdout, 'c1': ''})
 		if err:
 			if a_python_script_was_run is True:
-				if 'Warning' in str(err):
+                if 'Warning' in str(err) and 'Error' not in str(err) and \
+                        'raise' not in str(err):
 					err = frame.format(type=yellow + 'Warning ' + normal + 'in',
 									   message=yellow + err.decode() + normal)
 				else:
