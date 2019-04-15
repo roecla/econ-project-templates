@@ -364,7 +364,30 @@ class Context(ctx):
 		except Exception as e:
 			raise Errors.WafError('Execution failure: %s' % str(e), ex=e)
 
+		red = '\x1b[01;31m'
+		normal = '\x1b[0m'
+		yellow = '\x1b[33m'
+		blue = '\x1b[01;34m'
+		green = '\x1b[32m'
+
+		if type(cmd) == str and '.py' in cmd:
+			a_python_script_was_run = True
+			python_exec, module_path = cmd.split()[:2]
+			append_args = cmd.split()[2:]
+
+			module = module_path.replace(str(self.path), '')[1:]
+			arg_str = ' '.join(append_args)
+			line = 60 * '*'
+
+			frame = '\n' + line + '\n{type} ' + green + module + ' ' + \
+				arg_str + normal + ':\n\n{message}' + line + '\n'
+		else:
+			a_python_script_was_run = False
+
 		if out:
+			if a_python_script_was_run is True:
+				out = frame.format(type='Output from', message=out.decode())
+
 			if not isinstance(out, str):
 				out = out.decode(encoding, errors='replace')
 			if self.logger:
@@ -372,6 +395,14 @@ class Context(ctx):
 			else:
 				Logs.info(out, extra={'stream':sys.stdout, 'c1': ''})
 		if err:
+			if a_python_script_was_run is True:
+				if 'Warning' in str(err):
+					err = frame.format(type=yellow + 'Warning ' + normal + 'in',
+									   message=yellow + err.decode() + normal)
+				else:
+					err = frame.format(type=red + 'Error ' + normal + 'in',
+									   message=yellow + err.decode() + normal)
+
 			if not isinstance(err, str):
 				err = err.decode(encoding, errors='replace')
 			if self.logger:
@@ -379,6 +410,25 @@ class Context(ctx):
 			else:
 				Logs.info(err, extra={'stream':sys.stderr, 'c1': ''})
 
+			if a_python_script_was_run is True:
+
+				start_string = "gnome-terminal -e 'bash -c \""
+				end_string = "\"'"
+				commands = [
+					'cd ' + str(self.path),
+					'export PYTHONPATH=$PYTHONPATH:' + str(self.path),
+					'python -m pdb ' + module + ' ' + arg_str
+				]
+
+				terminal_cmd = start_string + '; '.join(commands) + end_string
+				debug = False
+				if 'Warning' not in str(err) and debug is True:
+					try:
+						os.system(terminal_cmd)
+					except KeyboardInterrupt:
+						raise
+					except:
+						pass
 		return ret
 
 	def cmd_and_log(self, cmd, **kw):
